@@ -1,0 +1,179 @@
+#include <bits/stdc++.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <pwd.h>
+#include<fcntl.h> 
+#include<stdlib.h> 
+using namespace std;
+// 保存当前的命令行输入
+char line[256];
+ 
+// 根据命令行输入等到的命令参数
+char args[10][80];
+ 
+// 命令参数个数
+int narg;
+int redir;   //判断是否有重定向符号
+char *file;  //记录重定向目标文件
+ 
+// 将命令参数拷贝到当前命令中
+void copy_args(char* cmd_args[]) {
+    int i=0;
+    for (i; i < narg; i++) {
+        cmd_args[i] = args[i];
+    }
+    for( i=0; cmd_args[i] != NULL; i++ )
+    {
+        if( strcmp( cmd_args[i],">" ) == 0 )  //命令中有输出重定向
+        {
+            redir = 1;
+        }
+     }
+   if( redir == 1 )           //命令只含有一个输出重定向符号
+     {
+        for( i=0; cmd_args[i] != NULL; i++ )
+        {
+            if( strcmp( cmd_args[i],">" )==0 )
+            {
+                file = cmd_args[i+1];
+                cmd_args[i] = NULL;
+            }
+        }
+    }
+}
+ // 执行 pwd 命令
+void exec_pwd() {
+    char buffer[256];
+    getcwd(buffer,256);
+    printf("%s\n", buffer);
+}
+ 
+// 执行 cd 命令
+void exec_cd() {
+    if (narg != 2) return;
+    chdir(args[1]); 
+    exec_pwd();
+}
+
+// 执行 ls 命令
+void exec_ls() {
+    int pid = fork();
+    int fd;
+    if (pid > 0) {
+        waitpid(pid, NULL, 0);
+        return;
+    }  
+    
+    char* cmd_args[10] = {};
+    copy_args(cmd_args);
+    if(redir == 1){	//如果命令有重定向
+        fd = open( file,O_RDWR | O_CREAT | O_TRUNC, 0644 );
+        dup2( fd,1 );    //指定新文件描述符为1,1为标准输出，0为标准输入
+    }
+    execv("/bin/ls", cmd_args);
+}
+//执行environ 命令
+void exec_env(){
+	pid_t pid = fork();
+	if(pid==0)
+	{execlp("env","",NULL);
+	}if(pid>0)
+	wait(NULL);
+		
+}
+//执行jobs命令
+void exec_jobs(){
+	pid_t pid = fork();
+	if(pid==0)
+	{execlp("pstree","-p",NULL);
+	}if(pid>0)
+	wait(NULL);
+}
+
+//echo 在屏幕上显示参数并换行
+void exec_echo(){
+	char array[999];
+	int s= strlen(line);
+	for(int i=5;i<s;i++)
+	{
+	   array[i-5]=line[i];
+		
+	}
+	printf("%s\n",array);	
+}
+
+//执行help
+void exec_help(){
+ 	    printf("/**********Method***********/\n");
+            printf("print cd<catalog> :find directory\n");
+            printf("print environ :List set\n");
+            printf("print echo<content> : print content\n");
+            printf("print help :List Method\n");
+            printf("print jobs :provide PID\n");
+            printf("print quit,exit,bye :break \n");
+            printf("/******Method***************/\n");
+}
+//显示提示内容
+void show() {
+	//获取用户名，主机名
+	char hostname[256] = { '\0' };
+	gethostname(hostname, sizeof(hostname));
+	//获取当前路径
+	char curpath[256] = { '\0' };
+	getcwd(curpath, 256);
+	char prompt = '$';
+	printf("\033[32m%s@%s:~\033[34m%s%c\033[035m ", getpwuid(getuid())->pw_name, hostname,curpath, prompt);
+}
+
+int main() {    
+    show();
+		printf("\n----------shell命令解释模拟器-----------\n");
+		printf("1.cd    2.environ    3.echo\n");
+		printf("4.help  5.jobs       6.quit,exit,bye\n");
+		printf("----------shell命令解释模拟器-----------\n");
+    while (cin.getline(line,256)) {
+        narg = sscanf(line, "%s%s%s%s%s%s%s%s%s%s",
+            args[0], args[1], args[2], args[3], args[4], 
+            args[5], args[6], args[7], args[8], args[9]);
+        if (strcmp(args[0], "quit") == 0){
+            break;
+        }
+        else if(strcmp(args[0], "bye")==0){
+			break;
+			}
+		else if(strcmp(args[0],  "exit")==0){
+			break;
+			}
+        else if (strcmp(args[0], "ls") == 0) {
+            exec_ls();
+        } 
+        else if (strcmp(args[0], "pwd") == 0) {
+            exec_pwd();
+        } 
+        else if (strcmp(args[0], "cd") == 0) {
+            exec_cd();
+        } 
+        else if(strcmp(args[0], "environ")==0){
+	    exec_env();
+	}
+	else if(strcmp(args[0], "echo")==0){
+	    exec_echo();
+	}
+	else if(strcmp(args[0], "help")==0){
+	    exec_help();
+	}
+	
+   	else if(strcmp(args[0], "jobs")==0){
+       exec_jobs();
+    	}
+	else {
+            printf("command not found\n");
+        }
+        show();
+	
+    }
+ 
+    return 0;
+}
